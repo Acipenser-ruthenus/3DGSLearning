@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLY 文件查看器 - 3DGS 数据解析</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+        
+        .content {
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        
+        .upload-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px dashed #6c757d;
+        }
+        
+        .file-input {
+            margin: 20px 0;
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .file-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            text-align: left;
+        }
+        
+        .data-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: right;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        th {
+            background-color: #2c3e50;
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        tr:hover {
+            background-color: #e9ecef;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .color-box {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border: 1px solid #ccc;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .page-btn {
+            padding: 8px 15px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .page-btn.active {
+            background: #3498db;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            margin-top: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            th, td {
+                padding: 8px 10px;
+            }
+        }
+        
+        .instructions {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .instructions ul {
+            padding-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .memory-info {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        
+        .property-details {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .property-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        
+        .property-item {
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PLY 文件查看器</h1>
+            <p class="subtitle">专为 3D Gaussian Splatting (3DGS) 数据查看设计</p>
+        </header>
+        
+        <div class="content">
+            <div class="upload-section">
+                <h2>上传您的 PLY 文件</h2>
+                <p>支持二进制格式的 PLY 文件，自动检测文件属性</p>
+                
+                <div class="file-input">
+                    <input type="file" id="ply-file" accept=".ply" style="display: none;">
+                    <button class="btn" id="browse-btn">选择文件</button>
+                    <span id="file-name" style="margin-left: 15px;">未选择文件</span>
+                </div>
+                
+                <div id="status-message" class="status"></div>
+                
+                <div id="file-info" class="file-info" style="display: none;">
+                    <h3>文件信息</h3>
+                    <p>格式: <span id="file-format">binary_little_endian 1.0</span></p>
+                    <p>顶点数量: <span id="vertex-count">0</span></p>
+                    <p>文件大小: <span id="file-size">0</span> MB</p>
+                    
+                    <div class="property-details">
+                        <h4>检测到的属性:</h4>
+                        <div id="properties-list" class="property-list">
+                            <!-- 属性列表将由JavaScript生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <div id="memory-info" class="memory-info" style="display: none;">
+                    已加载: <span id="loaded-vertices">0</span> / <span id="total-vertices">0</span> 个顶点
+                    (<span id="loaded-percent">0</span>%)
+                </div>
+            </div>
+            
+            <div class="data-section">
+                <h2>数据预览</h2>
+                <div class="controls">
+                    <div>
+                        <label for="rows-per-page">每页显示行数: </label>
+                        <select id="rows-per-page">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <input type="text" id="search-input" placeholder="在当前页搜索..." style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                        <button class="btn" style="padding: 8px 15px;" id="search-btn">搜索</button>
+                    </div>
+                </div>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>正在解析文件，请稍候...</p>
+                </div>
+                
+                <div class="table-container">
+                    <table id="data-table">
+                        <thead>
+                            <tr>
+                                <th>索引</th>
+                                <!-- 动态表头将由JavaScript生成 -->
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="11" style="text-align: center;">请上传PLY文件以查看数据</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="pagination" id="pagination">
+                    <button class="page-btn" id="prev-btn">上一页</button>
+                    <button class="page-btn active">1</button>
+                    <button class="page-btn">2</button>
+                    <button class="page-btn">3</button>
+                    <button class="page-btn" id="next-btn">下一页</button>
+                </div>
+            </div>
+            
+            <div class="instructions">
+                <h3>使用说明</h3>
+                <ul>
+                    <li>点击"选择文件"按钮上传您的PLY文件</li>
+                    <li>支持二进制小端格式的PLY文件</li>
+                    <li>系统会自动从文件头中提取属性信息</li>
+                    <li>大文件会自动分页加载，避免浏览器崩溃</li>
+                    <li>您可以使用分页控件浏览数据，或使用搜索功能在当前页查找特定值</li>
+                    <li>注意：大文件可能需要一些时间来解析</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>PLY 文件查看器 &copy; 2025 - 专为 3DGS 学习者设计</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('ply-file');
+            const browseBtn = document.getElementById('browse-btn');
+            const fileName = document.getElementById('file-name');
+            const fileInfo = document.getElementById('file-info');
+            const loading = document.getElementById('loading');
+            const statusMessage = document.getElementById('status-message');
+            const dataTable = document.getElementById('data-table').getElementsByTagName('tbody')[0];
+            const memoryInfo = document.getElementById('memory-info');
+            const propertiesList = document.getElementById('properties-list');
+            
+            let fileData = null;
+            let propertyDefinitions = [];
+            let vertexCount = 0;
+            let vertexSize = 0;
+            let headerEndIndex = 0;
+            let currentPage = 1;
+            let rowsPerPage = 20;
+            let totalPages = 0;
+            let fileFormat = '';
+            
+            // 文件选择处理
+            browseBtn.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    const file = this.files[0];
+                    fileName.textContent = file.name;
+                    
+                    // 显示加载指示器
+                    loading.style.display = 'block';
+                    
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            fileData = e.target.result;
+                            
+                            if (!parsePLYHeader(fileData)) {
+                                return;
+                            }
+                            
+                            calculateVertexSize();
+                            
+                            // 更新属性显示
+                            updatePropertiesDisplay();
+                            
+                            // 加载第一页数据
+                            loadPageData(1);
+                            
+                        } catch (error) {
+                            console.error('解析PLY文件时出错:', error);
+                            showStatus('解析文件时出错: ' + error.message, 'error');
+                        } finally {
+                            // 隐藏加载指示器
+                            loading.style.display = 'none';
+                        }
+                    };
+                    
+                    reader.onerror = function() {
+                        showStatus('读取文件时出错', 'error');
+                        loading.style.display = 'none';
+                    };
+                    
+                    reader.readAsArrayBuffer(file);
+                }
+            });
+            
+            // 解析PLY文件头
+            function parsePLYHeader(arrayBuffer) {
+                const headerText = new TextDecoder().decode(arrayBuffer.slice(0, 2048));
+                const headerLines = headerText.split('\n');
+                
+                if (!headerLines[0].includes('ply')) {
+                    showStatus('错误: 不是有效的PLY文件', 'error');
+                    return false;
+                }
+                
+                vertexCount = 0;
+                propertyDefinitions = [];
+                headerEndIndex = 0;
+                fileFormat = '';
+                
+                for (let i = 0; i < headerLines.length; i++) {
+                    const line = headerLines[i].trim();
+                    
+                    if (line.startsWith('format')) {
+                        fileFormat = line.split(' ')[1];
+                        document.getElementById('file-format').textContent = line.split(' ').slice(1).join(' ');
+                    } else if (line.startsWith('element vertex')) {
+                        vertexCount = parseInt(line.split(' ')[2]);
+                    } else if (line.startsWith('property')) {
+                        const parts = line.split(' ');
+                        if (parts.length >= 3) {
+                            const type = parts[1];
+                            const name = parts.slice(2).join(' ');
+                            propertyDefinitions.push({ type, name });
+                        }
+                    } else if (line === 'end_header') {
+                        headerEndIndex = headerText.indexOf('end_header') + 'end_header'.length;
+                        break;
+                    }
+                }
+                
+                // 检查是否成功解析
+                if (vertexCount === 0 || propertyDefinitions.length === 0) {
+                    showStatus('错误: 无法解析PLY文件头', 'error');
+                    return false;
+                }
+                
+                // 更新文件信息
+                document.getElementById('vertex-count').textContent = vertexCount.toLocaleString();
+                document.getElementById('total-vertices').textContent = vertexCount.toLocaleString();
+                
+                // 计算文件大小
+                const fileSizeMB = (arrayBuffer.byteLength / (1024 * 1024)).toFixed(2);
+                document.getElementById('file-size').textContent = fileSizeMB;
+                
+                fileInfo.style.display = 'block';
+                memoryInfo.style.display = 'block';
+                
+                return true;
+            }
+            
+            // 更新属性显示
+            function updatePropertiesDisplay() {
+                propertiesList.innerHTML = '';
+                
+                propertyDefinitions.forEach(prop => {
+                    const propItem = document.createElement('div');
+                    propItem.className = 'property-item';
+                    propItem.textContent = `${prop.name} (${prop.type})`;
+                    propertiesList.appendChild(propItem);
+                });
+            }
+            
+            // 计算顶点大小
+            function calculateVertexSize() {
+                vertexSize = 0;
+                for (const prop of propertyDefinitions) {
+                    if (prop.type === 'float' || prop.type === 'int32' || prop.type === 'uint32') vertexSize += 4;
+                    else if (prop.type === 'double') vertexSize += 8;
+                    else if (prop.type === 'uchar' || prop.type === 'uint8') vertexSize += 1;
+                    else if (prop.type === 'short' || prop.type === 'int16' || prop.type === 'uint16') vertexSize += 2;
+                    else {
+                        console.warn(`未知的属性类型: ${prop.type}, 假设为4字节`);
+                        vertexSize += 4;
+                    }
+                }
+            }
+            
+            // 加载指定页的数据
+            function loadPageData(page) {
+                if (!fileData || vertexCount === 0) return;
+                
+                currentPage = page;
+                const start = (page - 1) * rowsPerPage;
+                const end = Math.min(start + rowsPerPage, vertexCount);
+                
+                // 显示加载指示器
+                loading.style.display = 'block';
+                
+                // 使用setTimeout让UI有机会更新
+                setTimeout(() => {
+                    try {
+                        const dataView = new DataView(fileData, headerEndIndex + 1);
+                        const result = [];
+                        
+                        let offset = start * vertexSize;
+                        
+                        for (let i = start; i < end; i++) {
+                            const vertex = {};
+                            let currentOffset = offset;
+                            
+                            for (const prop of propertyDefinitions) {
+                                if (prop.type === 'float') {
+                                    vertex[prop.name] = dataView.getFloat32(currentOffset, true).toFixed(6);
+                                    currentOffset += 4;
+                                } else if (prop.type === 'double') {
+                                    vertex[prop.name] = dataView.getFloat64(currentOffset, true).toFixed(6);
+                                    currentOffset += 8;
+                                } else if (prop.type === 'int32' || prop.type === 'int') {
+                                    vertex[prop.name] = dataView.getInt32(currentOffset, true);
+                                    currentOffset += 4;
+                                } else if (prop.type === 'uint32' || prop.type === 'uint') {
+                                    vertex[prop.name] = dataView.getUint32(currentOffset, true);
+                                    currentOffset += 4;
+                                } else if (prop.type === 'uchar' || prop.type === 'uint8') {
+                                    vertex[prop.name] = dataView.getUint8(currentOffset);
+                                    currentOffset += 1;
+                                } else if (prop.type === 'short' || prop.type === 'int16') {
+                                    vertex[prop.name] = dataView.getInt16(currentOffset, true);
+                                    currentOffset += 2;
+                                } else if (prop.type === 'ushort' || prop.type === 'uint16') {
+                                    vertex[prop.name] = dataView.getUint16(currentOffset, true);
+                                    currentOffset += 2;
+                                } else {
+                                    // 未知类型，跳过
+                                    console.warn(`未知的属性类型: ${prop.type}`);
+                                    currentOffset += 4; // 默认假设为4字节
+                                }
+                            }
+                            
+                            result.push(vertex);
+                            offset = currentOffset;
+                        }
+                        
+                        displayData(result, page);
+                        
+                        // 更新内存使用信息
+                        document.getElementById('loaded-vertices').textContent = end.toLocaleString();
+                        document.getElementById('loaded-percent').textContent = ((end / vertexCount) * 100).toFixed(1);
+                        
+                    } catch (error) {
+                        console.error('解析数据时出错:', error);
+                        showStatus('解析数据时出错: ' + error.message, 'error');
+                    } finally {
+                        // 隐藏加载指示器
+                        loading.style.display = 'none';
+                    }
+                }, 10);
+            }
+            
+            // 显示状态消息
+            function showStatus(message, type) {
+                statusMessage.textContent = message;
+                statusMessage.className = 'status ' + type;
+                statusMessage.style.display = 'block';
+                
+                // 5秒后隐藏状态消息
+                setTimeout(() => {
+                    statusMessage.style.display = 'none';
+                }, 5000);
+            }
+            
+            // 显示数据到表格
+            function displayData(data, page) {
+                dataTable.innerHTML = '';
+                
+                // 更新表头
+                const tableHead = document.querySelector('#data-table thead tr');
+                tableHead.innerHTML = '<th>索引</th>';
+                
+                for (const prop of propertyDefinitions) {
+                    const th = document.createElement('th');
+                    th.textContent = prop.name;
+                    tableHead.appendChild(th);
+                }
+                
+                // 如果有颜色属性，添加颜色列
+                if (hasColorProperties()) {
+                    const colorTh = document.createElement('th');
+                    colorTh.textContent = '颜色';
+                    tableHead.appendChild(colorTh);
+                }
+                
+                if (data.length === 0) {
+                    const row = dataTable.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = propertyDefinitions.length + 2;
+                    cell.textContent = '没有找到数据';
+                    cell.style.textAlign = 'center';
+                    return;
+                }
+                
+                const startIndex = (page - 1) * rowsPerPage;
+                
+                data.forEach((item, index) => {
+                    const row = dataTable.insertRow();
+                    const globalIndex = startIndex + index;
+                    
+                    // 索引列
+                    row.insertCell(0).textContent = globalIndex + 1;
+                    
+                    // 数据列
+                    for (const prop of propertyDefinitions) {
+                        const cell = row.insertCell();
+                        cell.textContent = item[prop.name] !== undefined ? item[prop.name] : 'N/A';
+                    }
+                    
+                    // 颜色列（如果存在颜色属性）
+                    if (hasColorProperties()) {
+                        const colorCell = row.insertCell();
+                        if (item.red !== undefined && item.green !== undefined && item.blue !== undefined) {
+                            const colorBox = document.createElement('div');
+                            colorBox.className = 'color-box';
+                            colorBox.style.backgroundColor = `rgb(${item.red}, ${item.green}, ${item.blue})`;
+                            colorCell.appendChild(colorBox);
+                        } else {
+                            colorCell.textContent = 'N/A';
+                        }
+                    }
+                });
+                
+                // 更新分页控件
+                updatePagination(page);
+            }
+            
+            // 检查是否有颜色属性
+            function hasColorProperties() {
+                return propertyDefinitions.some(p => 
+                    p.name === 'red' || p.name === 'green' || p.name === 'blue' ||
+                    p.name === 'r' || p.name === 'g' || p.name === 'b' ||
+                    p.name === 'diffuse_red' || p.name === 'diffuse_green' || p.name === 'diffuse_blue'
+                );
+            }
+            
+            // 更新分页控件
+            function updatePagination(currentPage) {
+                totalPages = Math.ceil(vertexCount / rowsPerPage);
+                const paginationContainer = document.getElementById('pagination');
+                paginationContainer.innerHTML = '';
+                
+                // 添加上一页按钮
+                const prevBtn = document.createElement('button');
+                prevBtn.className = 'page-btn';
+                prevBtn.id = 'prev-btn';
+                prevBtn.textContent = '上一页';
+                prevBtn.disabled = currentPage === 1;
+                prevBtn.addEventListener('click', () => {
+                    if (currentPage > 1) {
+                        loadPageData(currentPage - 1);
+                    }
+                });
+                paginationContainer.appendChild(prevBtn);
+                
+                // 添加页码按钮
+                const startPage = Math.max(1, currentPage - 2);
+                const endPage = Math.min(totalPages, startPage + 4);
+                
+                for (let i = startPage; i <= endPage; i++) {
+                    const pageBtn = document.createElement('button');
+                    pageBtn.className = 'page-btn';
+                    if (i === currentPage) {
+                        pageBtn.classList.add('active');
+                    }
+                    pageBtn.textContent = i;
+                    pageBtn.addEventListener('click', () => {
+                        loadPageData(i);
+                    });
+                    paginationContainer.appendChild(pageBtn);
+                }
+                
+                // 添加下一页按钮
+                const nextBtn = document.createElement('button');
+                nextBtn.className = 'page-btn';
+                nextBtn.id = 'next-btn';
+                nextBtn.textContent = '下一页';
+                nextBtn.disabled = currentPage === totalPages;
+                nextBtn.addEventListener('click', () => {
+                    if (currentPage < totalPages) {
+                        loadPageData(currentPage + 1);
+                    }
+                });
+                paginationContainer.appendChild(nextBtn);
+            }
+            
+            // 每页行数更改事件
+            document.getElementById('rows-per-page').addEventListener('change', function() {
+                rowsPerPage = parseInt(this.value);
+                if (fileData) {
+                    totalPages = Math.ceil(vertexCount / rowsPerPage);
+                    loadPageData(1);
+                }
+            });
+            
+            // 搜索功能（仅限当前页）
+            document.getElementById('search-btn').addEventListener('click', function() {
+                const searchTerm = document.getElementById('search-input').value.toLowerCase();
+                if (searchTerm) {
+                    const rows = dataTable.getElementsByTagName('tr');
+                    for (let i = 0; i < rows.length; i++) {
+                        const cells = rows[i].getElementsByTagName('td');
+                        let found = false;
+                        
+                        for (let j = 0; j < cells.length; j++) {
+                            if (cells[j].textContent.toLowerCase().includes(searchTerm)) {
+                                found = true;
+                                break;
+                            }
+                        }
+                        
+                        rows[i].style.backgroundColor = found ? '#fff3cd' : '';
+                    }
+                } else {
+                    const rows = dataTable.getElementsByTagName('tr');
+                    for (let i = 0; i < rows.length; i++) {
+                        rows[i].style.backgroundColor = '';
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
